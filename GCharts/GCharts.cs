@@ -14,8 +14,13 @@ namespace GCharts
             var saida = "\"Date(";
             var cdata = new DateTime();
             DateTime.TryParse(data, out cdata);
-            saida += cdata.Year + "," + cdata.Month + "," + cdata.Day;
-            return saida + ")\"";
+            if (cdata.Year > 1950) { 
+                saida += cdata.Year + "," + cdata.Month + "," + cdata.Day;
+                saida += ")\"";
+                //saida += ",\"f\": \"" + "dd/MM/yyyy hh:mm" + "\"";
+                return saida;
+            }
+            return "null";
         }
         public static string ListToGChartJson<T>(this List<T> list)
         {
@@ -44,10 +49,11 @@ namespace GCharts
                 var col = new StringBuilder();
                 foreach (var prop in _prop)
                 {
-                    col.Append("{\"id\":\"" + prop + "\",\"label\": \"" +
-                            prop + "\",\"type\":\"" +
-                            Dict[list[0].GetType().GetProperty(prop).GetValue(list[0]).GetType().FullName]
-                            + "\"}"
+                    var temp = list[0].GetType().GetProperty(prop).PropertyType.FullName;
+                    col.Append("{\"id\":\"" + prop + "\","+
+                        //"\"pattern\": \"" + (Dict[temp] == "date" ? "dd/MM/yyyy hh:mm" : "") + "\"," +
+                        "\"label\": \"" + prop + "\","+
+                        "\"type\":\"" + Dict[temp] + "\"}"
                             );
                 }
                 JSONstring = JSONstring.Replace("@cols", col.ToString().Replace("}{", "},{"));
@@ -56,17 +62,18 @@ namespace GCharts
                     var row = new StringBuilder();
                     foreach (var prop in _prop)
                     {
+                        var parsedstring = item.ConvertToString(prop);
                         row.Append("{\"v\": " +
                                 //Trata string
-                                (Dict[item.GetType().GetProperty(prop).GetValue(item).GetType().FullName] == "string" ? "\""
-                                + item.GetType().GetProperty(prop).GetValue(item).ToString().Replace("\"","\\\"") + "\"" : "")
+                                (Dict[item.GetType().GetProperty(prop).PropertyType.FullName] == "string" ? "\""
+                                + parsedstring.Replace("\"", "\\\"") + "\"" : "")
                                 //Trata Data
-                                + (Dict[item.GetType().GetProperty(prop).GetValue(item).GetType().FullName] == "date" ?
-                                ToDate(item.GetType().GetProperty(prop).GetValue(item).ToString())
+                                + (Dict[item.GetType().GetProperty(prop).PropertyType.FullName] == "date" ?
+                                ToDate(parsedstring)
                                 : "")
                                 //Trata numeros
-                                + (Dict[item.GetType().GetProperty(prop).GetValue(item).GetType().FullName] == "number" ?
-                                item.GetType().GetProperty(prop).GetValue(item).ToString().Replace(",", ".")
+                                + (Dict[item.GetType().GetProperty(prop).PropertyType.FullName] == "number" ?
+                                parsedstring.Replace(",", ".")
                                 : "")
                             + "}"
                             );
@@ -77,6 +84,12 @@ namespace GCharts
                 //Console.WriteLine(JSONstring);
                 return JSONstring;
             }
+        }
+        private static string ConvertToString<T>( this T val,string prop)
+        {
+            Type t = Nullable.GetUnderlyingType(val.GetType().GetProperty(prop).PropertyType) ?? val.GetType().GetProperty(prop).PropertyType;
+            var safe = val.GetType().GetProperty(prop).GetValue(val) == null ? "" : val.GetType().GetProperty(prop).GetValue(val);
+            return safe.ToString();
         }
     }
 }
